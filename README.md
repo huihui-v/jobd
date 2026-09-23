@@ -17,21 +17,21 @@ python3 jobd.py --bind 127.0.0.1 --port 6006 \
 
 进程挂掉不得带走已 `setsid` 的子任务。
 
-## 守护启动
+## 守护启动（一次投递 sh，非交互）
 
-token 写在 `jobd.env`（mode 600，不进 git）：
+环境变量带 token，跑 `daemon.sh up`。会写入 `jobd.env`（600）再拉起，不用手工编辑。
 
 ```bash
-cp jobd.env.example jobd.env
-chmod 600 jobd.env
-# 填 JOBD_TOKEN=
-./daemon.sh install
-./daemon.sh start
-./daemon.sh status
-./daemon.sh stop
+export JOBD_TOKEN='…'
+if [ ! -d /root/jobd/.git ]; then
+  git clone https://github.com/huihui-v/jobd.git /root/jobd
+else
+  git -C /root/jobd pull --ff-only
+fi
+/root/jobd/daemon.sh up
 ```
 
-有 systemd：装 `jobd.service`，`Restart=always`，`KillMode=process`（杀 jobd 不带走 setsid 子任务）。没有 systemd（多数 Vast/Docker）：`nohup` + `jobd.pid`。
+有 systemd：装 unit 并 `enable --now`。没有：`nohup` + `jobd.pid`。停：`/root/jobd/daemon.sh stop`。
 
 ## 环境
 
