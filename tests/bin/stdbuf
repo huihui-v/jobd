@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# GNU stdbuf shim for hosts without coreutils (macOS tests).
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -oL|-eL|-o0|-e0|-oI|-eI) shift ;;
+    -o|-e) shift 2 ;;
+    *) break ;;
+  esac
+done
+exec "$@"
