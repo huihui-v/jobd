@@ -28,6 +28,7 @@ machine_env=$1
 job_env=$2
 user_sh=$3
 exit_file=$4
+cd_sh=$5
 (
   set -e
   set -a
@@ -38,8 +39,8 @@ exit_file=$4
   set -a
   source "$job_env"
   set +a
-  if [ -n "${WORKSPACE_ROOT:-}" ]; then
-    cd "$WORKSPACE_ROOT/AIGCTeam_comfy_boot"
+  if [ -f "$cd_sh" ]; then
+    source "$cd_sh"
   fi
   exec stdbuf -oL -eL bash "$user_sh"
 )
@@ -48,9 +49,49 @@ printf '%s\n' "$ec" > "$exit_file"
 exit "$ec"
 """
 
+IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_BRACE_VAR = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+_PLAIN_VAR = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
+
 
 def sh_single_quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
+
+
+def bash_expandable_double_quote(value: str) -> str:
+    """Double-quoted bash word. Only $IDENT / ${IDENT} stay expandable."""
+    out = ['"']
+    i = 0
+    n = len(value)
+    while i < n:
+        if value.startswith("${", i):
+            m = _BRACE_VAR.match(value, i)
+            if not m:
+                raise ValueError("bad ${} expansion")
+            out.append(m.group(0))
+            i = m.end()
+            continue
+        if value[i] == "$":
+            m = _PLAIN_VAR.match(value, i)
+            if not m:
+                raise ValueError("bad $ expansion")
+            out.append(m.group(0))
+            i = m.end()
+            continue
+        ch = value[i]
+        if ch in ('"', "\\", "`"):
+            out.append("\\" + ch)
+        else:
+            out.append(ch)
+        i += 1
+    out.append('"')
+    return "".join(out)
+
+
+def bash_word(value: str) -> str:
+    if "$" in value:
+        return bash_expandable_double_quote(value)
+    return sh_single_quote(value)
 
 
 def utc_now() -> str:
@@ -123,6 +164,10 @@ class JobManager:
     def wrapper_path(self) -> Path:
         return self.current / "wrapper.sh"
 
+    @property
+    def cd_sh(self) -> Path:
+        return self.current / "cd.sh"
+
     def authorized(self, header: str) -> bool:
         if not header or not header.startswith("Bearer "):
             return False
@@ -157,14 +202,20 @@ class JobManager:
         with self.lock:
             return self.refresh()
 
-    def submit(self, script: str, env: dict, name: str, force: bool):
+    def submit(self, script: str, env: dict, name: str, force: bool, cwd=None):
+        try:
+            self._check_expandable(cwd)
+            for val in env.values():
+                self._check_expandable(None if val is None else str(val))
+        except ValueError as e:
+            return "bad", {"error": str(e)}
         with self.lock:
             st = self.refresh()
             if st and st.get("status") == "running":
                 if not force:
                     return "conflict", st
                 self._cancel_locked(st)
-            return "ok", self._start_locked(script, env, name)
+            return "ok", self._start_locked(script, env, name, cwd)
 
     def cancel(self):
         with self.lock:
@@ -189,10 +240,11 @@ class JobManager:
         text = chunk.decode("utf-8", "replace")
         return {"data": text, "offset": offset + len(chunk)}
 
-    def _start_locked(self, script: str, env: dict, name: str):
+    def _start_locked(self, script: str, env: dict, name: str, cwd=None):
         self.current.mkdir(parents=True, exist_ok=True)
         self.user_sh.write_bytes(script.encode("utf-8"))
         self._write_job_env(env)
+        self._write_cd_sh(cwd)
         self.wrapper_path.write_text(WRAPPER, encoding="utf-8")
         if self.exit_file.exists():
             self.exit_file.unlink()
@@ -209,6 +261,7 @@ class JobManager:
                     str(self.job_env),
                     str(self.user_sh),
                     str(self.exit_file),
+                    str(self.cd_sh),
                 ],
                 stdin=subprocess.DEVNULL,
                 stdout=fd,
@@ -242,8 +295,21 @@ class JobManager:
                 continue
             if not KEY_RE.match(key):
                 continue
-            lines.append("export %s=%s\n" % (key, sh_single_quote(str(val))))
+            lines.append("export %s=%s\n" % (key, bash_word(str(val))))
         self.job_env.write_text("".join(lines), encoding="utf-8")
+
+    def _write_cd_sh(self, cwd) -> None:
+        if not cwd:
+            if self.cd_sh.exists():
+                self.cd_sh.unlink()
+            return
+        self.cd_sh.write_text("cd -- %s\n" % bash_word(cwd), encoding="utf-8")
+
+    @staticmethod
+    def _check_expandable(value):
+        if value is None or value == "":
+            return
+        bash_word(str(value))
 
     def _cancel_locked(self, st) -> None:
         pid = int(st.get("pid") or 0)
@@ -357,8 +423,15 @@ def make_handler(manager: JobManager):
                     self._json(400, {"error": "env must be object"})
                     return
                 name = payload.get("name") if isinstance(payload.get("name"), str) else ""
+                cwd = payload.get("cwd")
+                if cwd is not None and not isinstance(cwd, str):
+                    self._json(400, {"error": "cwd must be string"})
+                    return
                 force = (qs.get("force") or [""])[0] in ("1", "true", "yes")
-                kind, st = manager.submit(script, env, name, force)
+                kind, st = manager.submit(script, env, name, force, cwd)
+                if kind == "bad":
+                    self._json(400, st)
+                    return
                 if kind == "conflict":
                     body = public_status(st)
                     body["error"] = "job running"

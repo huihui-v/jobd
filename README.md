@@ -23,7 +23,7 @@ python3 jobd.py --bind 127.0.0.1 --port 18789 \
 
 1. `set -a; source --machine-env; set +a`（文件不存在则跳过）
 2. `set -a; source $workdir/current/job.env; set +a`（本趟 POST 写入）
-3. `cd` 到 `$WORKSPACE_ROOT/AIGCTeam_comfy_boot`（`WORKSPACE_ROOT` 来自上一步；未设置则保持当前目录）
+3. 请求带了 `cwd` 则 `cd` 过去（缺省保持 `current/`）
 4. `exec stdbuf -oL -eL bash user.sh`
 
 禁止 `bash -i`、`bash -lc`、`source ~/.bashrc`。
@@ -36,7 +36,7 @@ python3 jobd.py --bind 127.0.0.1 --port 18789 \
 export WORKSPACE_ROOT=/root/autodl-tmp
 ```
 
-jobd 不创建、不修改这个文件。
+jobd 不创建、不修改这个文件。source 之后，里面 **所有 export 的变量** 都能在请求的 `cwd` 和 `env` 值里用 `$VAR` / `${VAR}` 展开（在 source machine.env 之后、source job.env / cd 时由 bash 展开）。不接受 `$()`、反引号、`${VAR:-x}` 这类替换。
 
 ## HTTP
 
@@ -48,16 +48,25 @@ jobd 不创建、不修改这个文件。
 
 ```json
 {
-  "script": "#!/bin/bash\n…",
+  "script": "#!/bin/bash\necho \"hello\"\n",
   "env": {
-    "ENV_FILE": "/abs/path/env_xxx.conf",
+    "ENV_FILE": "${WORKSPACE_ROOT}/env_xxx.conf",
     "ENV_VERSION": "bbb-v2"
   },
+  "cwd": "${WORKSPACE_ROOT}/AIGCTeam_comfy_boot",
   "name": "provision-start"
 }
 ```
 
-`script` 原样写入 `user.sh`。`env` 写入 `job.env`（`export KEY=value`，值安全单引号）。handler 不得等待脚本结束。立刻返回 `{ "job_id", "status": "running" }`。
+`script` 原样写入 `user.sh`。`env` 写入 `job.env`。可选 `cwd`：展开后 `cd` 到该目录；不传则留在 `current/`。handler 不得等待脚本结束。立刻返回 `{ "job_id", "status": "running" }`。
+
+请求体是 **JSON**。`script` 里的双引号写成 `\"`，换行写成 `\n`。用语言自带的 JSON 编码即可，不要手拼。curl 示例：
+
+```bash
+python3 -c 'import json,sys; json.dump({"script":"echo \"hi\"\n","cwd":"${WORKSPACE_ROOT}/AIGCTeam_comfy_boot","env":{"ENV_FILE":"${WORKSPACE_ROOT}/env_xxx.conf","ENV_VERSION":"bbb-v2"}}, sys.stdout)' \
+  | curl -sS -H "Authorization: Bearer $HKPC_JOB_TOKEN" -H 'Content-Type: application/json' \
+    --data-binary @- http://127.0.0.1:18789/jobs
+```
 
 ### GET /jobs/current
 
@@ -83,5 +92,3 @@ jobd 不创建、不修改这个文件。
 ```bash
 python3 tests/test_jobd.py
 ```
-
-覆盖：无 token → 401；`echo $WORKSPACE_ROOT` 等于 `--machine-env` 里的值；`ENV_VERSION=bbb-v2` 在脚本与 `ENV_VERSION=$ENV_VERSION cmd` 都能读到；杀掉 jobd 后用户脚本仍在，再起 jobd 能续读日志、状态仍对；running 时第二次 POST → 409；cancel 后子进程一并结束。

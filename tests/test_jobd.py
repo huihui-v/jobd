@@ -138,13 +138,15 @@ class JobdTests(unittest.TestCase):
             except Exception:
                 pass
 
-    def post_job(self, script, env=None, name="t", force=False, token=TOKEN):
+    def post_job(self, script, env=None, name="t", force=False, token=TOKEN, cwd=None):
         path = "/jobs"
         if force:
             path += "?force=1"
         body = {"script": script, "name": name}
         if env is not None:
             body["env"] = env
+        if cwd is not None:
+            body["cwd"] = cwd
         return http("POST", self.base + path, body=body, token=token)
 
     def wait_log_contains(self, needle: str, timeout=8):
@@ -285,6 +287,51 @@ class JobdTests(unittest.TestCase):
         self.post_job("echo hi\n")
         self.wait_status("exited")
         self.assertEqual(self.machine_env.read_text(encoding="utf-8"), before)
+
+    def test_no_cwd_stays_in_job_current(self):
+        code, _, _ = self.post_job("pwd\n")
+        self.assertEqual(code, 200)
+        log = self.wait_log_contains("current")
+        last = log.strip().splitlines()[-1]
+        self.assertEqual(Path(last).resolve(), (self.workdir / "current").resolve())
+
+    def test_cwd_expands_all_machine_env_exports(self):
+        dest = self.ws_root / "runhere"
+        dest.mkdir()
+        with self.machine_env.open("a", encoding="utf-8") as f:
+            f.write("export PLACE='%s'\n" % dest.as_posix())
+        code, _, _ = self.post_job("pwd\n", cwd="${PLACE}")
+        self.assertEqual(code, 200)
+        log = self.wait_log_contains(dest.as_posix())
+        self.assertEqual(log.strip().splitlines()[-1], dest.as_posix())
+
+    def test_cwd_workspace_root_join(self):
+        dest = self.ws_root / "AIGCTeam_comfy_boot"
+        code, _, _ = self.post_job("pwd\n", cwd="${WORKSPACE_ROOT}/AIGCTeam_comfy_boot")
+        self.assertEqual(code, 200)
+        log = self.wait_log_contains(dest.as_posix())
+        self.assertEqual(log.strip().splitlines()[-1], dest.as_posix())
+
+    def test_env_file_expands_workspace_root(self):
+        expected = self.ws_root.as_posix() + "/env_xxx.conf"
+        code, _, _ = self.post_job(
+            'echo "FILE=$ENV_FILE"\n',
+            env={"ENV_FILE": "${WORKSPACE_ROOT}/env_xxx.conf", "ENV_VERSION": "bbb-v2"},
+        )
+        self.assertEqual(code, 200)
+        log = self.wait_log_contains(expected)
+        self.assertIn("FILE=" + expected, log.splitlines())
+        self.wait_status("exited")
+
+    def test_script_json_double_quotes(self):
+        code, _, _ = self.post_job('echo "hello quotes"\n')
+        self.assertEqual(code, 200)
+        self.wait_log_contains("hello quotes")
+
+    def test_bad_cwd_command_subst_is_400(self):
+        code, body, _ = self.post_job("pwd\n", cwd="$(reboot)")
+        self.assertEqual(code, 400)
+        self.assertIn("error", body)
 
 
 if __name__ == "__main__":
