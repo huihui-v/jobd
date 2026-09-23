@@ -85,6 +85,8 @@ class JobdTests(unittest.TestCase):
             "export WORKSPACE_ROOT='%s'\n" % self.ws_root.as_posix(),
             encoding="utf-8",
         )
+        self.default_cwd = Path(self.tmpdir) / "default-cwd"
+        self.default_cwd.mkdir()
         self.port = free_port()
         self.base = "http://127.0.0.1:%d" % self.port
         self.proc = self._start_jobd()
@@ -106,6 +108,8 @@ class JobdTests(unittest.TestCase):
                 str(self.machine_env),
                 "--workdir",
                 str(self.workdir),
+                "--default-cwd",
+                str(self.default_cwd),
             ],
             env=env,
             stdout=subprocess.DEVNULL,
@@ -288,12 +292,12 @@ class JobdTests(unittest.TestCase):
         self.wait_status("exited")
         self.assertEqual(self.machine_env.read_text(encoding="utf-8"), before)
 
-    def test_no_cwd_stays_in_job_current(self):
+    def test_no_cwd_uses_default_cwd(self):
         code, _, _ = self.post_job("pwd\n")
         self.assertEqual(code, 200)
-        log = self.wait_log_contains("current")
+        log = self.wait_log_contains(self.default_cwd.as_posix())
         last = log.strip().splitlines()[-1]
-        self.assertEqual(Path(last).resolve(), (self.workdir / "current").resolve())
+        self.assertEqual(Path(last).resolve(), self.default_cwd.resolve())
 
     def test_cwd_expands_all_machine_env_exports(self):
         dest = self.ws_root / "runhere"
@@ -327,6 +331,16 @@ class JobdTests(unittest.TestCase):
         code, _, _ = self.post_job('echo "hello quotes"\n')
         self.assertEqual(code, 200)
         self.wait_log_contains("hello quotes")
+
+    def test_cli_defaults(self):
+        sys.path.insert(0, str(ROOT))
+        import jobd as jobd_mod
+
+        args = jobd_mod.parse_args(["--token", "x"])
+        self.assertEqual(args.port, 6006)
+        self.assertEqual(args.default_cwd, "/root")
+        self.assertEqual(args.workdir, "/root/hkpc-job")
+        self.assertEqual(args.machine_env, "/root/.machine.env")
 
     def test_bad_cwd_command_subst_is_400(self):
         code, body, _ = self.post_job("pwd\n", cwd="$(reboot)")

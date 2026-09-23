@@ -132,11 +132,12 @@ def child_alive(pid: int):
 
 
 class JobManager:
-    def __init__(self, workdir, machine_env, token):
+    def __init__(self, workdir, machine_env, token, default_cwd="/root"):
         self.workdir = Path(workdir)
         self.current = self.workdir / "current"
         self.machine_env = Path(machine_env)
         self.token = token
+        self.default_cwd = default_cwd or "/root"
         self.lock = threading.Lock()
         self.current.mkdir(parents=True, exist_ok=True)
 
@@ -299,11 +300,8 @@ class JobManager:
         self.job_env.write_text("".join(lines), encoding="utf-8")
 
     def _write_cd_sh(self, cwd) -> None:
-        if not cwd:
-            if self.cd_sh.exists():
-                self.cd_sh.unlink()
-            return
-        self.cd_sh.write_text("cd -- %s\n" % bash_word(cwd), encoding="utf-8")
+        target = cwd or self.default_cwd
+        self.cd_sh.write_text("cd -- %s\n" % bash_word(target), encoding="utf-8")
 
     @staticmethod
     def _check_expandable(value):
@@ -498,10 +496,11 @@ def public_status(st):
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description="jobd — thin edge job agent")
     p.add_argument("--bind", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=18789)
+    p.add_argument("--port", type=int, default=6006)
     p.add_argument("--token", required=True)
     p.add_argument("--machine-env", default="/root/.machine.env")
     p.add_argument("--workdir", default="/root/hkpc-job")
+    p.add_argument("--default-cwd", default="/root")
     return p.parse_args(argv)
 
 
@@ -510,7 +509,7 @@ def main(argv=None) -> int:
     if not args.token:
         sys.stderr.write("jobd: --token is required\n")
         return 2
-    mgr = JobManager(args.workdir, args.machine_env, args.token)
+    mgr = JobManager(args.workdir, args.machine_env, args.token, args.default_cwd)
     httpd = ThreadingHTTPServer((args.bind, args.port), make_handler(mgr))
     try:
         httpd.serve_forever()

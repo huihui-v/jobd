@@ -7,13 +7,13 @@
 ## 起
 
 ```bash
-python3 jobd.py --bind 127.0.0.1 --port 18789 \
+python3 jobd.py --bind 127.0.0.1 --port 6006 \
   --token "$HKPC_JOB_TOKEN" \
   --machine-env /root/.machine.env \
   --workdir /root/hkpc-job
 ```
 
-`--token` 必填。`--machine-env` 缺省 `/root/.machine.env`。数据目录缺省 `/root/hkpc-job`（`current/user.sh`、`current/job.env`、`current/job.log`、`current/status.json`）。
+`--token` 必填。`--port` 缺省 `6006`。`--machine-env` 缺省 `/root/.machine.env`。数据目录缺省 `/root/hkpc-job`。不传 `cwd` 时脚本在 `/root` 下跑（`--default-cwd`，缺省 `/root`）。
 
 进程挂掉不得带走已 `setsid` 的子任务。
 
@@ -23,7 +23,7 @@ python3 jobd.py --bind 127.0.0.1 --port 18789 \
 
 1. `set -a; source --machine-env; set +a`（文件不存在则跳过）
 2. `set -a; source $workdir/current/job.env; set +a`（本趟 POST 写入）
-3. 请求带了 `cwd` 则 `cd` 过去（缺省保持 `current/`）
+3. 请求带了 `cwd` 则 `cd` 过去；不传则 `cd /root`（`--default-cwd`）
 4. `exec stdbuf -oL -eL bash user.sh`
 
 禁止 `bash -i`、`bash -lc`、`source ~/.bashrc`。
@@ -58,14 +58,14 @@ jobd 不创建、不修改这个文件。source 之后，里面 **所有 export 
 }
 ```
 
-`script` 原样写入 `user.sh`。`env` 写入 `job.env`。可选 `cwd`：展开后 `cd` 到该目录；不传则留在 `current/`。handler 不得等待脚本结束。立刻返回 `{ "job_id", "status": "running" }`。
+`script` 原样写入 `user.sh`。`env` 写入 `job.env`。可选 `cwd`：展开后 `cd` 到该目录；不传则 `/root`。handler 不得等待脚本结束。立刻返回 `{ "job_id", "status": "running" }`。
 
 请求体是 **JSON**。`script` 里的双引号写成 `\"`，换行写成 `\n`。用语言自带的 JSON 编码即可，不要手拼。curl 示例：
 
 ```bash
 python3 -c 'import json,sys; json.dump({"script":"echo \"hi\"\n","cwd":"${WORKSPACE_ROOT}/AIGCTeam_comfy_boot","env":{"ENV_FILE":"${WORKSPACE_ROOT}/env_xxx.conf","ENV_VERSION":"bbb-v2"}}, sys.stdout)' \
-  | curl -sS -H "Authorization: Bearer $HKPC_JOB_TOKEN" -H 'Content-Type: application/json' \
-    --data-binary @- http://127.0.0.1:18789/jobs
+    | curl -sS -H "Authorization: Bearer $HKPC_JOB_TOKEN" -H 'Content-Type: application/json' \
+      --data-binary @- http://127.0.0.1:6006/jobs
 ```
 
 ### GET /jobs/current
