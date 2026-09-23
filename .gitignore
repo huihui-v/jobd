@@ -2,3 +2,7 @@ __pycache__/
 *.py[cod]
 .DS_Store
 .venv/
+current/
+jobd.env
+jobd.pid
+jobd.daemon.log

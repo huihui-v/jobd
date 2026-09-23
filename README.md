@@ -10,12 +10,28 @@
 python3 jobd.py --bind 127.0.0.1 --port 6006 \
   --token "$HKPC_JOB_TOKEN" \
   --machine-env /root/.machine.env \
-  --workdir /root/hkpc-job
+  --workdir /root/jobd
 ```
 
-`--token` 必填。`--port` 缺省 `6006`。`--machine-env` 缺省 `/root/.machine.env`。数据目录缺省 `/root/hkpc-job`。不传 `cwd` 时脚本在 `/root` 下跑（`--default-cwd`，缺省 `/root`）。
+`--token` 必填（也可环境变量 `HKPC_JOB_TOKEN`，守护启动用这个，避免出现在 `ps`）。`--port` 缺省 `6006`。`--machine-env` 缺省 `/root/.machine.env`。数据目录缺省 `/root/jobd`（与仓库同目录，`current/` 不进 git）。不传 `cwd` 时脚本在 `/root` 下跑。
 
 进程挂掉不得带走已 `setsid` 的子任务。
+
+## 守护启动
+
+token 写在 `jobd.env`（mode 600，不进 git）：
+
+```bash
+cp jobd.env.example jobd.env
+chmod 600 jobd.env
+# 填 HKPC_JOB_TOKEN=
+./daemon.sh install
+./daemon.sh start
+./daemon.sh status
+./daemon.sh stop
+```
+
+有 systemd：装 `jobd.service`，`Restart=always`，`KillMode=process`（杀 jobd 不带走 setsid 子任务）。没有 systemd（多数 Vast/Docker）：`nohup` + `jobd.pid`。
 
 ## 环境
 

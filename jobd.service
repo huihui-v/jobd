@@ -1,0 +1,16 @@
+[Unit]
+Description=jobd edge job agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/jobd
+EnvironmentFile=-/root/jobd/jobd.env
+ExecStart=/usr/bin/python3 /root/jobd/jobd.py --bind 127.0.0.1 --port 6006 --machine-env /root/.machine.env --workdir /root/jobd --default-cwd /root
+Restart=always
+RestartSec=2
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
