@@ -55,7 +55,7 @@ start_jobd() {
     return 0
   fi
   nohup python3 "$HERE/jobd.py" \
-    --bind 127.0.0.1 --port 6006 \
+    --bind 0.0.0.0 --port 6006 \
     --machine-env /root/.machine.env \
     --workdir "$HERE" \
     --default-cwd /root \

@@ -7,7 +7,7 @@
 ## 起
 
 ```bash
-python3 jobd.py --bind 127.0.0.1 --port 6006 \
+python3 jobd.py --bind 0.0.0.0 --port 6006 \
   --token "$JOBD_TOKEN" \
   --machine-env /root/.machine.env \
   --workdir /root/jobd
