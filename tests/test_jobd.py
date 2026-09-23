@@ -346,16 +346,16 @@ class JobdTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT))
         import jobd as jobd_mod
 
-        prev = os.environ.get("HKPC_JOB_TOKEN")
-        os.environ["HKPC_JOB_TOKEN"] = "from-env"
+        prev = os.environ.get("JOBD_TOKEN")
+        os.environ["JOBD_TOKEN"] = "from-env"
         try:
             args = jobd_mod.parse_args([])
             self.assertEqual(args.token, "from-env")
         finally:
             if prev is None:
-                del os.environ["HKPC_JOB_TOKEN"]
+                del os.environ["JOBD_TOKEN"]
             else:
-                os.environ["HKPC_JOB_TOKEN"] = prev
+                os.environ["JOBD_TOKEN"] = prev
 
     def test_bad_cwd_command_subst_is_400(self):
         code, body, _ = self.post_job("pwd\n", cwd="$(reboot)")

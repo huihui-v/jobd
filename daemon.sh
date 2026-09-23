@@ -17,7 +17,7 @@ ensure_envfile() {
     umask 077
     cp "$HERE/jobd.env.example" "$ENVFILE"
     chmod 600 "$ENVFILE"
-    echo "wrote $ENVFILE — fill HKPC_JOB_TOKEN" >&2
+    echo "wrote $ENVFILE — fill JOBD_TOKEN" >&2
   fi
 }
 
@@ -47,11 +47,11 @@ case "$cmd" in
       # shellcheck disable=SC1090
       . "$ENVFILE"
       set +a
-      if [ -z "${HKPC_JOB_TOKEN:-}" ]; then
-        echo "set HKPC_JOB_TOKEN in $ENVFILE" >&2
+      if [ -z "${JOBD_TOKEN:-}" ]; then
+        echo "set JOBD_TOKEN in $ENVFILE" >&2
         exit 2
       fi
-      export HKPC_JOB_TOKEN
+      export JOBD_TOKEN
       nohup python3 "$HERE/jobd.py" \
         --bind 127.0.0.1 --port 6006 \
         --machine-env /root/.machine.env \

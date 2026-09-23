@@ -497,7 +497,7 @@ def parse_args(argv=None):
     p = argparse.ArgumentParser(description="jobd — thin edge job agent")
     p.add_argument("--bind", default="127.0.0.1")
     p.add_argument("--port", type=int, default=6006)
-    p.add_argument("--token", default=os.environ.get("HKPC_JOB_TOKEN") or "")
+    p.add_argument("--token", default=os.environ.get("JOBD_TOKEN") or "")
     p.add_argument("--machine-env", default="/root/.machine.env")
     p.add_argument("--workdir", default="/root/jobd")
     p.add_argument("--default-cwd", default="/root")
@@ -507,7 +507,7 @@ def parse_args(argv=None):
 def main(argv=None) -> int:
     args = parse_args(argv)
     if not args.token:
-        sys.stderr.write("jobd: --token or HKPC_JOB_TOKEN is required\n")
+        sys.stderr.write("jobd: --token or JOBD_TOKEN is required\n")
         return 2
     mgr = JobManager(args.workdir, args.machine_env, args.token, args.default_cwd)
     httpd = ThreadingHTTPServer((args.bind, args.port), make_handler(mgr))

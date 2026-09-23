@@ -8,12 +8,12 @@
 
 ```bash
 python3 jobd.py --bind 127.0.0.1 --port 6006 \
-  --token "$HKPC_JOB_TOKEN" \
+  --token "$JOBD_TOKEN" \
   --machine-env /root/.machine.env \
   --workdir /root/jobd
 ```
 
-`--token` 必填（也可环境变量 `HKPC_JOB_TOKEN`，守护启动用这个，避免出现在 `ps`）。`--port` 缺省 `6006`。`--machine-env` 缺省 `/root/.machine.env`。数据目录缺省 `/root/jobd`（与仓库同目录，`current/` 不进 git）。不传 `cwd` 时脚本在 `/root` 下跑。
+`--token` 必填（也可环境变量 `JOBD_TOKEN`，守护启动用这个，避免出现在 `ps`）。`--port` 缺省 `6006`。`--machine-env` 缺省 `/root/.machine.env`。数据目录缺省 `/root/jobd`（与仓库同目录，`current/` 不进 git）。不传 `cwd` 时脚本在 `/root` 下跑。
 
 进程挂掉不得带走已 `setsid` 的子任务。
 
@@ -24,7 +24,7 @@ token 写在 `jobd.env`（mode 600，不进 git）：
 ```bash
 cp jobd.env.example jobd.env
 chmod 600 jobd.env
-# 填 HKPC_JOB_TOKEN=
+# 填 JOBD_TOKEN=
 ./daemon.sh install
 ./daemon.sh start
 ./daemon.sh status
@@ -80,7 +80,7 @@ jobd 不创建、不修改这个文件。source 之后，里面 **所有 export 
 
 ```bash
 python3 -c 'import json,sys; json.dump({"script":"echo \"hi\"\n","cwd":"${WORKSPACE_ROOT}/AIGCTeam_comfy_boot","env":{"ENV_FILE":"${WORKSPACE_ROOT}/env_xxx.conf","ENV_VERSION":"bbb-v2"}}, sys.stdout)' \
-    | curl -sS -H "Authorization: Bearer $HKPC_JOB_TOKEN" -H 'Content-Type: application/json' \
+    | curl -sS -H "Authorization: Bearer $JOBD_TOKEN" -H 'Content-Type: application/json' \
       --data-binary @- http://127.0.0.1:6006/jobs
 ```
 
