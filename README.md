@@ -40,11 +40,11 @@ fi
 1. `set -a; source --machine-env; set +a`（文件不存在则跳过）
 2. `set -a; source $workdir/current/job.env; set +a`（本趟 POST 写入）
 3. 请求带了 `cwd` 则 `cd` 过去；不传则 `cd /root`（`--default-cwd`）
-4. `exec stdbuf -oL -eL bash user.sh`
+4. `exec stdbuf -oL -e0 bash user.sh`
 
 禁止 `bash -i`、`bash -lc`、`source ~/.bashrc`。
 
-`job.env` 只允许 `ENV_FILE`、`ENV_VERSION`（及请求里显式给出的同名键）。不要把 host 的整份环境灌进去。
+`job.env` 只允许 `ENV_FILE`、`ENV_VERSION`、`PROVISION_UI`（及请求里显式给出的同名键）。不要把 host 的整份环境灌进去。
 
 `machine.env` 由机主准备，例如：
 

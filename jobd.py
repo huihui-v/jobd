@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-ALLOWED_ENV = ("ENV_FILE", "ENV_VERSION")
+ALLOWED_ENV = ("ENV_FILE", "ENV_VERSION", "PROVISION_UI")
 KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 MAX_BODY = 8 * 1024 * 1024
 
@@ -42,7 +42,7 @@ cd_sh=$5
   if [ -f "$cd_sh" ]; then
     source "$cd_sh"
   fi
-  exec stdbuf -oL -eL bash "$user_sh"
+  exec stdbuf -oL -e0 bash "$user_sh"
 )
 ec=$?
 printf '%s\n' "$ec" > "$exit_file"

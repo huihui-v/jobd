@@ -205,6 +205,15 @@ class JobdTests(unittest.TestCase):
         self.assertIn("ENV_VERSION", job_env)
         self.assertNotIn("WORKSPACE_ROOT", job_env)
 
+    def test_provision_ui_exported(self):
+        script = "echo ui:$PROVISION_UI\n"
+        code, _, _ = self.post_job(script, env={"PROVISION_UI": "jobd"})
+        self.assertEqual(code, 200)
+        log = self.wait_log_contains("ui:jobd")
+        self.assertIn("ui:jobd", log.splitlines())
+        job_env = (self.workdir / "current" / "job.env").read_text(encoding="utf-8")
+        self.assertIn("PROVISION_UI", job_env)
+
     def test_jobd_death_does_not_kill_job_and_restart_resumes(self):
         script = (
             "echo started\n"
