@@ -42,6 +42,7 @@ cd_sh=$5
   if [ -f "$cd_sh" ]; then
     source "$cd_sh"
   fi
+  export GIT_TERMINAL_PROMPT=0
   exec stdbuf -oL -e0 bash "$user_sh"
 )
 ec=$?
