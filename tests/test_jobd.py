@@ -346,8 +346,8 @@ class JobdTests(unittest.TestCase):
         import jobd as jobd_mod
 
         args = jobd_mod.parse_args(["--token", "x"])
-        self.assertEqual(args.port, 16006)
-        self.assertEqual(args.bind, "127.0.0.1")
+        self.assertEqual(args.port, 6006)
+        self.assertEqual(args.bind, "0.0.0.0")
         self.assertEqual(args.default_cwd, "/root")
         self.assertEqual(args.workdir, "/root/jobd")
         self.assertEqual(args.machine_env, "/root/.machine.env")
